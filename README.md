@@ -4,7 +4,7 @@ curator is a node app that reposts images from a message thread on Insagram to a
 
 ## Setup
 
-- Clone the project
+- Clone this repository
 - Install node
   - npm install
 - Get mongodb
