@@ -155,7 +155,9 @@ function getPostedImageUrls(){
       assert.equal(null, err);
       var col = db.collection('images');
       var data = col.find({}).toArray((err, data) => {
-        postedImageUrls = data[0].urls;
+        postedImageUrls = data.map((d) => {
+          return d.url;
+        });
         db.close();
         resolve();
       });
@@ -165,7 +167,8 @@ function getPostedImageUrls(){
 
 function getUnpostedImageUrls(){
   unpostedImageUrls = newImageUrls.filter((url) => {
-    return true;
+    console.log("already posted:", postedImageUrls.includes(url))
+    return !postedImageUrls.includes(url);
   })
 }
 
@@ -173,10 +176,7 @@ function downloadImageByUrl(url){
   return new Promise((resolve, reject) => {
     var filename = 'temp/' + new Date().getTime() + '.jpg';
     filePaths.push(filename);
-    console.log("downloading: ", filename);
     request.head(url, function(err, res, body){
-      console.log('content-type:', res.headers['content-type']);
-      console.log('content-length:', res.headers['content-length']);
       request(url).pipe(fs.createWriteStream(filename)).on('close', () => {
         resolve();
       });
@@ -186,12 +186,10 @@ function downloadImageByUrl(url){
 
 function downloadImagesByUrl(){
   return new Promise((resolve, reject) => {
-    console.log("Downloading images by url");
     var promiseImages = unpostedImageUrls.map((url) => {
         console.log("url:", url);
         return downloadImageByUrl(url);
     });
-    console.log("init Promises");
     Promise.all(promiseImages).then(() => {
       resolve();
     });
@@ -199,20 +197,42 @@ function downloadImagesByUrl(){
 }
 
 function postImages(){
-  filePaths.forEach((path) => {
-    console.log("uploading image:", path);
-    new Client.Upload.photo(session, path).then((upload) => {
-  		console.log(upload.params.uploadId);
-  		return new Client.Media.configurePhoto(session, upload.params.uploadId, 'akward caption');
-  	})
-  	.then((medium) => {
-  		console.log(medium.params)
-  	})
+  return new Promise((resolve, reject) => {
+    filePaths.forEach((path) => {
+      new Client.Upload.photo(session, path).then((upload) => {
+    		return new Client.Media.configurePhoto(session, upload.params.uploadId, 'akward caption');
+    	})
+    	.then((medium) => {
+        resolve();
+    	})
+    });
   });
 }
 
-function recordPostedImages(){
-  
+function recordPostedUrl(url){
+  return new Promise((resolve, reject) => {
+    MongoClient.connect(dbUrl, (err, db) => {
+      assert.equal(null, err);
+      var col = db.collection('images');
+      col.insertOne({"url":url}, (err, r) => {
+        assert.equal(null, err);
+        assert.equal(1, r.insertedCount);
+        db.close();
+        resolve();
+      });
+    });
+  });
+}
+
+function recordPostedUrls(){
+  return new Promise((resolve, reject) => {
+    var promiseInserts = unpostedImageUrls.map((url) => {
+        return recordPostedUrl(url);
+    });
+    Promise.all(promiseInserts).then(() => {
+      resolve();
+    });
+  });
 }
 
 function main(){
@@ -221,17 +241,18 @@ function main(){
       setInboxFeed().then(() => {
         setThreadWithName();
         setThreadItemFeed().then(() => {
-            getNewImageUrls();
-            getPostedImageUrls().then(() => {
-              getUnpostedImageUrls();
-              downloadImagesByUrl().then(() => {
-                console.log("downloaded images");
-                postImages().then(() => {
-                  console.log("posted images");
-                  recordPostedImages();
+          getNewImageUrls();
+          getPostedImageUrls().then(() => {
+            getUnpostedImageUrls();
+            downloadImagesByUrl().then(() => {
+              postImages().then(() => {
+                console.log("posted images");
+                recordPostedUrls().then(() => {
+                  console.log("recorded posted urls");
                 });
-              })
-            });
+              });
+            })
+          });
         });
       });
     });
