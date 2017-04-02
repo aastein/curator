@@ -1,0 +1,25 @@
+{
+  "name": "curator",
+  "private": true,
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/index.js"
+  },
+  "keywords": [
+    "instagram",
+    "memes"
+  ],
+  "author": "Aaron Stein",
+  "license": "MIT",
+  "dependencies": {
+    "babelify-es6-polyfill": "^1.0.4",
+    "jsonwebtoken": "^7.2.1",
+    "request": "^2.79.0",
+    "instagram-private-api": "0.5.15",
+    "mongodb": "2.2.25",
+    "assert": "1.4.1",
+    "node-schedule": "1.2.1" 
+  }
+}
