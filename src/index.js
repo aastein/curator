@@ -206,18 +206,28 @@ function downloadImagesByUrl(){
   });
 }
 
+function postImage(path){
+  return new Promise((resolve, reject) => {
+    new Client.Upload.photo(session, path).then((upload) => {
+      console.log("Posting image:", path);
+      return new Client.Media.configurePhoto(session, upload.params.uploadId, '');
+    })
+    .then((medium) => {
+      console.log("Posted image");
+      resolve();
+    })
+  });
+}
+
 function postImages(){
   return new Promise((resolve, reject) => {
-    console.log("Posting images");
-    filePaths.forEach((path) => {
-      new Client.Upload.photo(session, path).then((upload) => {
-        console.log("Posting image:", path);
-    		return new Client.Media.configurePhoto(session, upload.params.uploadId, '');
-    	})
-    	.then((medium) => {
-        console.log("Posted image");
-        resolve();
-    	})
+    var promiseUploads = filePaths.map((path) => {
+        console.log("Path:", path);
+        return postImage(path);
+    });
+    Promise.all(promiseUploads).then(() => {
+      console.log("Posted images");
+      resolve();
     });
   });
 }
