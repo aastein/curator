@@ -14,6 +14,8 @@ curator is a node app that reposts images from a message thread on Insagram to a
   - mongod --dbpath db
 - Go to mongodb command line
     - mongo
+- Create a table for the appp
+  - use curator
 - Add Instrgram credentials to the db
   - db.credentials.insert({"username":"aUserName","password":"aPassword"})
 - Add cookies directroy to the db
