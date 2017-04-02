@@ -7,14 +7,11 @@ const schedule = require('node-schedule');
 const instagram = require('instagram-private-api');
 const MongoClient = require('mongodb').MongoClient
 const assert = require('assert');
-
 const dbUrl = 'mongodb://localhost:27017/curator';
-const credentialPath = 'config/credentials.json';
 
 var Client = instagram.V1;
 var storage;
 var device;
-
 var config;
 var username;
 var password;
@@ -24,12 +21,9 @@ var session;
 var inboxFeed;
 var thread;
 var threadFeed;
-
 var newImagePosts = [];
 var postedImageUrls;
 var unpostedImagePosts;
-
-var filePaths = [];
 
 // Read credentials from the database and set credential variables
 function setCredentials(){
