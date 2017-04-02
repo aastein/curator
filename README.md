@@ -20,3 +20,9 @@ curator is a node app that reposts images from a message thread on Insagram to a
   - db.config.insert({"storage":"../cookies"})
 - Add message thread name to the db
   - db.config.insert({"threadName":"direct message thread name"})
+  
+## Usage
+
+- Run by command line
+  - npm start
+- Each run looks at the last 100 messages in the message thread
