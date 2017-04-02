@@ -25,12 +25,13 @@ var inboxFeed;
 var thread;
 var threadFeed;
 
-var newImageUrls;
+var newImagePosts = [];
 var postedImageUrls;
-var unpostedImageUrls;
+var unpostedImagePosts;
 
 var filePaths = [];
 
+// Read credentials from the database and set credential variables
 function setCredentials(){
   return new Promise((resolve, reject) => {
     MongoClient.connect(dbUrl, (err, db) => {
@@ -50,6 +51,7 @@ function setCredentials(){
   });
 }
 
+// Set the storeage path from the value specified the config object
 function setStoragePath(){
   storagePath = config.filter((record) => {
     return record.storage != null;
@@ -57,6 +59,7 @@ function setStoragePath(){
   console.log("Set storage path to:", storagePath);
 }
 
+// Set the name of the group chat or message thread specifiedin the config object
 function setThreadName(){
   threadName = config.find((record) => {
     return record.threadName != null;
@@ -64,6 +67,7 @@ function setThreadName(){
   console.log("Set threadName to:", threadName);
 }
 
+// Reads the config from the database sets the config object
 function setConfig(){
   return new Promise((resolve, reject) => {
     MongoClient.connect(dbUrl, (err, db) => {
@@ -81,6 +85,7 @@ function setConfig(){
   });
 }
 
+// Sets up the credentials and configurations
 function setup(){
   return new Promise((resolve, reject) => {
       setConfig().then(() => {
@@ -92,6 +97,7 @@ function setup(){
   });
 }
 
+// Sets the instagram session. This is eqivalent to logging in
 function setSession(){
   return new Promise((resolve, reject) => {
     console.log("Setting session");
@@ -105,6 +111,7 @@ function setSession(){
   });
 }
 
+// Sets the inboxFeed. The inboxFeed is the users inbox.
 function setInboxFeed(){
   return new Promise((resolve, reject) => {
     console.log("Setting inbox feed")
@@ -116,6 +123,9 @@ function setInboxFeed(){
   });
 }
 
+// Finds the correct thread in the inboxFeed. This is eqivalent to finding the
+// group chat or message thread by the title of the group chat or message thread
+// in the users inbox.
 function setThreadWithName(){
   console.log("Setting thread by name:", threadName);
   thread = inboxFeed.find((thread) => {
@@ -124,6 +134,8 @@ function setThreadWithName(){
   console.log("Set thread");
 }
 
+// Gets the threadItems feed from the thread. This is equivalent to getting the
+// messages in the group chat or message thread.
 function setThreadItemFeed(){
   return new Promise((resolve, reject) => {
     console.log("Setting thread items feed from feed");
@@ -135,9 +147,11 @@ function setThreadItemFeed(){
   });
 }
 
-function getNewImageUrls(){
-  console.log("Setting new image urls");
-  newImageUrls = threadFeed.filter((item) => {
+// Gets only messages in the thread which are shared images.
+// Each imagePost has a url of the image and the username of the original poster
+function getnewImagePosts(){
+  console.log("Setting new image posts");
+  newImagePosts = threadFeed.filter((item) => {
     return item.getParams().mediaShare != null;
   }).filter((item) => {
     return item.getParams().mediaShare.mediaType == 1;
@@ -146,11 +160,15 @@ function getNewImageUrls(){
   }).filter((item) => {
     return item.getParams().mediaShare.images[0].url != null;
   }).map((item) => {
-    return item.getParams().mediaShare.images[0].url;
+    var url = item.getParams().mediaShare.images[0].url;
+    var sourceName = item.getParams().mediaShare.account.username;
+    console.log("A feed:", sourceName);
+    return [url,sourceName];
   });
-  console.log("Set new image urls:", newImageUrls);
+  console.log("Set new image posts:", newImagePosts);
 }
 
+// Reads previously posted urls from the databse and stores the value in postedImageUrls
 function getPostedImageUrls(){
   return new Promise((resolve, reject) => {
     MongoClient.connect(dbUrl, (err, db) => {
@@ -170,19 +188,24 @@ function getPostedImageUrls(){
   });
 }
 
-function getUnpostedImageUrls(){
-  unpostedImageUrls = newImageUrls.filter((url) => {
-    console.log("Already posted:", postedImageUrls.includes(url))
-    return !postedImageUrls.includes(url);
+// Filters the list of newImagePosts for posts which have urls that are not in
+// the postedImageUrls object.
+function getUnpostedImagePosts(){
+  unpostedImagePosts = newImagePosts.filter((imagePost) => {
+    console.log("Already posted:", postedImageUrls.includes(imagePost[0]))
+    return !postedImageUrls.includes(imagePost[0]);
   })
-  console.log("Set unposteed image urls:", unpostedImageUrls);
+  console.log("Set unposteed image urls:", unpostedImagePosts);
 }
 
-function downloadImageByUrl(url){
+// Downloads an imagePost by the imagePosts url and the file path of the imagePost
+// The file path is added to an imagePost in downloadImagePosts() before invoking
+// this method.
+function downloadImagePost(imagePost){
   return new Promise((resolve, reject) => {
+    var url = imagePost[0];
+    var filename = imagePost[2];
     console.log("Downloading image by url:", url);
-    var filename = 'temp/' + new Date().getTime() + '.jpg';
-    filePaths.push(filename);
     request.head(url, function(err, res, body){
       request(url).pipe(fs.createWriteStream(filename)).on('close', () => {
         console.log("Downloaded image");
@@ -192,12 +215,23 @@ function downloadImageByUrl(url){
   });
 }
 
-function downloadImagesByUrl(){
+// For each unpostedImagePost this method sets a download path for the imagePost
+// then downloads the image specified by the imagePost
+function downloadImagePosts(){
   return new Promise((resolve, reject) => {
     console.log("Downloading images");
-    var promiseImages = unpostedImageUrls.map((url) => {
-        console.log("url:", url);
-        return downloadImageByUrl(url);
+
+    // Set download paths for each imagePost
+    unpostedImagePosts = unpostedImagePosts.map((imagePost) => {
+      var filename = 'temp/' + new Date().getTime() + '.jpg';
+      imagePost.push(filename);
+      return imagePost;
+    });
+
+    // Download all unpostedImagePosts
+    var promiseImages = unpostedImagePosts.map((imagePost) => {
+      console.log("url:", imagePost[0]);
+      return downloadImagePost(imagePost);
     });
     Promise.all(promiseImages).then(() => {
       console.log("Downloaded images");
@@ -206,11 +240,16 @@ function downloadImagesByUrl(){
   });
 }
 
-function postImage(path){
+// Posts the image specifed in the imagePost .The minimum comment is a tag of
+// the original poster.
+function postImage(imagePost){
   return new Promise((resolve, reject) => {
+    var path = imagePost[2];
+    var comment = '@' + imagePost[1];
+    // Uploads and posts the image to Instagram
     new Client.Upload.photo(session, path).then((upload) => {
       console.log("Posting image:", path);
-      return new Client.Media.configurePhoto(session, upload.params.uploadId, '');
+      return new Client.Media.configurePhoto(session, upload.params.uploadId, comment);
     })
     .then((medium) => {
       console.log("Posted image");
@@ -219,11 +258,13 @@ function postImage(path){
   });
 }
 
+// Posts all images in the unpostedImagePosts
 function postImages(){
   return new Promise((resolve, reject) => {
-    var promiseUploads = filePaths.map((path) => {
-        console.log("Path:", path);
-        return postImage(path);
+    // Post the images
+    var promiseUploads = unpostedImagePosts.map((imagePost) => {
+        console.log("Path:", imagePost[2]);
+        return postImage(imagePost);
     });
     Promise.all(promiseUploads).then(() => {
       console.log("Posted images");
@@ -232,6 +273,8 @@ function postImages(){
   });
 }
 
+// Writes the url of a newly posted image to the database so that it will not
+// be posted again.
 function recordPostedUrl(url){
   return new Promise((resolve, reject) => {
     MongoClient.connect(dbUrl, (err, db) => {
@@ -250,11 +293,13 @@ function recordPostedUrl(url){
   });
 }
 
+// Writes the url of all newly posted images to the database so they will noy
+// be posted again.
 function recordPostedUrls(){
   return new Promise((resolve, reject) => {
     console.log("Recording posted image urls");
-    var promiseInserts = unpostedImageUrls.map((url) => {
-        return recordPostedUrl(url);
+    var promiseInserts = unpostedImagePosts.map((imagePost) => {
+        return recordPostedUrl(imagePost[0]);
     });
     Promise.all(promiseInserts).then(() => {
       console.log("Recorded posted image urls");
@@ -263,16 +308,17 @@ function recordPostedUrls(){
   });
 }
 
+// Runs all the things
 function main(){
   setup().then(() => {
     setSession().then(() => {
       setInboxFeed().then(() => {
         setThreadWithName();
         setThreadItemFeed().then(() => {
-          getNewImageUrls();
+          getnewImagePosts();
           getPostedImageUrls().then(() => {
-            getUnpostedImageUrls();
-            downloadImagesByUrl().then(() => {
+            getUnpostedImagePosts();
+            downloadImagePosts().then(() => {
               postImages().then(() => {
                 recordPostedUrls().then(() => {
                   console.log("Done");
@@ -286,4 +332,5 @@ function main(){
   });
 }
 
+// Entry point
 main();
