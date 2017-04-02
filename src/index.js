@@ -200,7 +200,7 @@ function postImages(){
   return new Promise((resolve, reject) => {
     filePaths.forEach((path) => {
       new Client.Upload.photo(session, path).then((upload) => {
-    		return new Client.Media.configurePhoto(session, upload.params.uploadId, 'akward caption');
+    		return new Client.Media.configurePhoto(session, upload.params.uploadId, '');
     	})
     	.then((medium) => {
         resolve();
