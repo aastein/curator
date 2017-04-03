@@ -145,6 +145,15 @@ function setThreadItemFeed(){
 // Each imagePost has a url of the image and the username of the original poster
 function getnewImagePosts(){
   console.log("Setting new image posts");
+  var index = 0;
+
+  // Index the messages in the feed
+  threadFeed = threadFeed.map((item) => {
+    item.curatorIndex = index;
+    index ++;
+    return item;
+  });
+
   newImagePosts = threadFeed.filter((item) => {
     return item.getParams().mediaShare != null;
   }).filter((item) => {
@@ -154,12 +163,26 @@ function getnewImagePosts(){
   }).filter((item) => {
     return item.getParams().mediaShare.images[0].url != null;
   }).map((item) => {
-    var url = item.getParams().mediaShare.images[0].url;
-    var sourceName = item.getParams().mediaShare.account.username;
-    console.log("A feed:", sourceName);
-    return [url,sourceName];
+    var imagePost = {};
+    imagePost.url = item.getParams().mediaShare.images[0].url;
+    imagePost.sourceName = item.getParams().mediaShare.account.username;
+    imagePost.index = item.curatorIndex;
+    imagePost.comment = '';
+    return imagePost;
   });
-  console.log("Set new image posts:", newImagePosts);
+
+  // Add subsequent text message as imagePost comment
+  newImagePosts = newImagePosts.map((imagePost) => {
+    if(imagePost.index > 0 && threadFeed[imagePost.index - 1] != null){
+      var nextPost = threadFeed[imagePost.index - 1];
+      if(nextPost.getParams().type === 'text'){
+        imagePost.comment = nextPost.getParams().text;
+      }
+    }
+    return imagePost;
+  });
+
+  console.log("Set new image posts");
 }
 
 // Reads previously posted urls from the databse and stores the value in postedImageUrls
@@ -186,8 +209,8 @@ function getPostedImageUrls(){
 // the postedImageUrls object.
 function getUnpostedImagePosts(){
   unpostedImagePosts = newImagePosts.filter((imagePost) => {
-    console.log("Already posted:", postedImageUrls.includes(imagePost[0]))
-    return !postedImageUrls.includes(imagePost[0]);
+    console.log("Already posted:", postedImageUrls.includes(imagePost.url))
+    return !postedImageUrls.includes(imagePost.url);
   })
   console.log("Set unposteed image urls:", unpostedImagePosts);
 }
@@ -197,11 +220,11 @@ function getUnpostedImagePosts(){
 // this method.
 function downloadImagePost(imagePost){
   return new Promise((resolve, reject) => {
-    var url = imagePost[0];
-    var filename = imagePost[2];
+    var url = imagePost.url;
+    var filePath = imagePost.filePath;
     console.log("Downloading image by url:", url);
     request.head(url, function(err, res, body){
-      request(url).pipe(fs.createWriteStream(filename)).on('close', () => {
+      request(url).pipe(fs.createWriteStream(filePath)).on('close', () => {
         console.log("Downloaded image");
         resolve();
       });
@@ -217,14 +240,14 @@ function downloadImagePosts(){
 
     // Set download paths for each imagePost
     unpostedImagePosts = unpostedImagePosts.map((imagePost) => {
-      var filename = 'temp/' + new Date().getTime() + '.jpg';
-      imagePost.push(filename);
+      var filePath = 'temp/' + new Date().getTime() + '.jpg';
+      imagePost.filePath = filePath;
       return imagePost;
     });
 
     // Download all unpostedImagePosts
     var promiseImages = unpostedImagePosts.map((imagePost) => {
-      console.log("url:", imagePost[0]);
+      console.log("url:", imagePost.url);
       return downloadImagePost(imagePost);
     });
     Promise.all(promiseImages).then(() => {
@@ -238,8 +261,8 @@ function downloadImagePosts(){
 // the original poster.
 function postImage(imagePost){
   return new Promise((resolve, reject) => {
-    var path = imagePost[2];
-    var comment = 'source: @' + imagePost[1];
+    var path = imagePost.filePath;
+    var comment = imagePost.comment + '. source: @' + imagePost.sourceName;
     // Uploads and posts the image to Instagram
     new Client.Upload.photo(session, path).then((upload) => {
       console.log("Posting image:", path);
@@ -257,7 +280,7 @@ function postImages(){
   return new Promise((resolve, reject) => {
     // Post the images
     var promiseUploads = unpostedImagePosts.map((imagePost) => {
-        console.log("Path:", imagePost[2]);
+        console.log("Path:", imagePost.filePath);
         return postImage(imagePost);
     });
     Promise.all(promiseUploads).then(() => {
@@ -293,7 +316,7 @@ function recordPostedUrls(){
   return new Promise((resolve, reject) => {
     console.log("Recording posted image urls");
     var promiseInserts = unpostedImagePosts.map((imagePost) => {
-        return recordPostedUrl(imagePost[0]);
+        return recordPostedUrl(imagePost.url);
     });
     Promise.all(promiseInserts).then(() => {
       console.log("Recorded posted image urls");
@@ -318,7 +341,7 @@ function main(){
                   console.log("Done");
                 });
               });
-            })
+            });
           });
         });
       });
