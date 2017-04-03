@@ -147,14 +147,12 @@ function getnewImagePosts(){
   console.log("Setting new image posts");
   var index = 0;
 
-  // Index the messages in the feed
-  threadFeed = threadFeed.map((item) => {
+  newImagePosts = threadFeed.map((item) => {
+    // Index the messages in the feed
     item.curatorIndex = index;
     index ++;
     return item;
-  });
-
-  newImagePosts = threadFeed.filter((item) => {
+  }).filter((item) => {
     return item.getParams().mediaShare != null;
   }).filter((item) => {
     return item.getParams().mediaShare.mediaType == 1;
