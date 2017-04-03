@@ -263,7 +263,7 @@ function postImage(imagePost){
   return new Promise((resolve, reject) => {
     var path = imagePost.filePath;
     var source = 'source: @' + imagePost.sourceName;
-    var comment = imagePost.comment != '' ? imagePost.comment + '. ' + source : source;
+    var comment = imagePost.comment != '' ? imagePost.comment + ' ' + source : source;
     // Uploads and posts the image to Instagram
     new Client.Upload.photo(session, path).then((upload) => {
       console.log("Posting image:", path);
