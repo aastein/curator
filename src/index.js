@@ -262,7 +262,8 @@ function downloadImagePosts(){
 function postImage(imagePost){
   return new Promise((resolve, reject) => {
     var path = imagePost.filePath;
-    var comment = imagePost.comment + '. source: @' + imagePost.sourceName;
+    var source = 'source: @' + imagePost.sourceName;
+    var comment = imagePost.comment != '' ? imagePost.comment + '. ' + source : source;
     // Uploads and posts the image to Instagram
     new Client.Upload.photo(session, path).then((upload) => {
       console.log("Posting image:", path);
