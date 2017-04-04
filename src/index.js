@@ -446,7 +446,7 @@ function recordPostedUrl(url){
 function recordPostedUrls(){
   return new Promise((resolve, reject) => {
     console.log("Recording posted urls");
-    
+
     var promiseInserts = [];
 
     var promiseInsertImageUrls = unpostedImagePosts.map((imagePost) => {
@@ -456,7 +456,8 @@ function recordPostedUrls(){
         return recordPostedUrl(videoPost.videoUrl);
     });
 
-    promiseInserts.push(promiseInsertImageUrls).push(promiseInsertVideoUrls);
+    promiseInserts.push(promiseInsertImageUrls);
+    promiseInserts.push(promiseInsertVideoUrls);
 
     Promise.all(promiseInserts).then(() => {
       console.log("Recorded posted image and video urls");
