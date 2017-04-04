@@ -356,7 +356,7 @@ function downloadPosts(){
 // the original poster.
 function postImage(imagePost){
   return new Promise((resolve, reject) => {
-    var path = imagePost.filePath;
+    var path = imagePost.filePath + imagePost.imageExtension;
     var source = 'source: @' + imagePost.sourceName;
     var comment = imagePost.comment != '' ? imagePost.comment + ' ' + source : source;
     // Uploads and posts the image to Instagram
