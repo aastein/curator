@@ -25,6 +25,8 @@ curator is a node app that reposts images and video from a message thread on Ins
 
 ## Usage
 
+- Share dank memes in a named group chat
 - Run by command line
   - npm start
+- Watch as the dank memes are automatically reposted
 - Each run looks at the last 100 messages in the message thread
