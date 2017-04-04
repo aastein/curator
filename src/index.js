@@ -247,7 +247,7 @@ function getPostedUrls(){
 // the postedUrls object.
 function getUnpostedPosts(){
   unpostedImagePosts = newImagePosts.filter((imagePost) => {
-    console.log("Already posted:", postedUrls.includes(imagePost.url))
+    console.log("Already posted:", postedUrls.includes(imagePost.imageUrl))
     return !postedUrls.includes(imagePost.imageUrl);
   });
 
