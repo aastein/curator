@@ -22,8 +22,10 @@ var inboxFeed;
 var thread;
 var threadFeed;
 var newImagePosts = [];
-var postedImageUrls;
+var newVideoPosts = [];
+var postedUrls;
 var unpostedImagePosts;
+var unpostedVideoPosts;
 
 // Read credentials from the database and set credential variables
 function setCredentials(){
@@ -143,7 +145,7 @@ function setThreadItemFeed(){
 
 // Gets only messages in the thread which are shared images.
 // Each imagePost has a url of the image and the username of the original poster
-function getnewImagePosts(){
+function getNewPosts(){
   console.log("Setting new image posts");
   var index = 0;
 
@@ -162,12 +164,39 @@ function getnewImagePosts(){
     return item.getParams().mediaShare.images[0].url != null;
   }).map((item) => {
     var imagePost = {};
-    imagePost.url = item.getParams().mediaShare.images[0].url;
+    imagePost.imageUrl = item.getParams().mediaShare.images[0].url;
     imagePost.sourceName = item.getParams().mediaShare.account.username;
     imagePost.index = item.curatorIndex;
+    imagePost.imageExtension = '.jpg'
+    imagePost.filePath = 'temp/a' + Math.ceil(Math.random()*new Date().getTime());
     imagePost.comment = '';
     return imagePost;
   });
+
+  console.log("Got new image posts");
+
+  newVideoPosts = threadFeed.filter((item) => {
+    return item.getParams().mediaShare != null;
+  }).filter((item) => {
+    return item.getParams().mediaShare.mediaType == 2;
+  }).filter((item) => {
+    return item.getParams().mediaShare.videos[0] != null;
+  }).filter((item) => {
+    return item.getParams().mediaShare.videos[0].url != null;
+  }).map((item) => {
+    var videoPost = {};
+    videoPost.videoUrl = item.getParams().mediaShare.videos[0].url;
+    videoPost.imageUrl = item.getParams().mediaShare.images[0].url;
+    videoPost.videoExtension = '.mp4';
+    videoPost.imageExtension = '.jpg';
+    videoPost.filePath = 'temp/a' + Math.ceil(Math.random()*new Date().getTime());
+    videoPost.sourceName = item.getParams().mediaShare.account.username;
+    videoPost.index = item.curatorIndex;
+    videoPost.comment = '';
+    return videoPost;
+  });
+
+  console.log("Got new video posts");
 
   // Add subsequent text message as imagePost comment
   newImagePosts = newImagePosts.map((imagePost) => {
@@ -180,11 +209,22 @@ function getnewImagePosts(){
     return imagePost;
   });
 
-  console.log("Set new image posts");
+  // Add subsequent text message as videoPost comment
+  newVideoPosts = newVideoPosts.map((videoPost) => {
+    if(videoPost.index > 0 && threadFeed[videoPost.index - 1] != null){
+      var nextPost = threadFeed[videoPost.index - 1];
+      if(nextPost.getParams().type === 'text'){
+        videoPost.comment = nextPost.getParams().text;
+      }
+    }
+    return videoPost;
+  });
+
+  console.log("Set new posts");
 }
 
-// Reads previously posted urls from the databse and stores the value in postedImageUrls
-function getPostedImageUrls(){
+// Reads previously posted urls from the databse and stores the value in postedUrls
+function getPostedUrls(){
   return new Promise((resolve, reject) => {
     MongoClient.connect(dbUrl, (err, db) => {
       assert.equal(null, err);
@@ -192,7 +232,7 @@ function getPostedImageUrls(){
       console.log("Getting posted image urls");
       var col = db.collection('images');
       var data = col.find({}).toArray((err, data) => {
-        postedImageUrls = data.map((d) => {
+        postedUrls = data.map((d) => {
           return d.url;
         });
         db.close();
@@ -204,53 +244,110 @@ function getPostedImageUrls(){
 }
 
 // Filters the list of newImagePosts for posts which have urls that are not in
-// the postedImageUrls object.
-function getUnpostedImagePosts(){
+// the postedUrls object.
+function getUnpostedPosts(){
   unpostedImagePosts = newImagePosts.filter((imagePost) => {
-    console.log("Already posted:", postedImageUrls.includes(imagePost.url))
-    return !postedImageUrls.includes(imagePost.url);
-  })
-  console.log("Set unposteed image urls:", unpostedImagePosts);
+    console.log("Already posted:", postedUrls.includes(imagePost.url))
+    return !postedUrls.includes(imagePost.imageUrl);
+  });
+
+  unpostedVideoPosts = newVideoPosts.filter((videoPost) => {
+    console.log("Already posted:", postedUrls.includes(videoPost.videoUrl))
+    return !postedUrls.includes(videoPost.videoUrl);
+  });
+
+  console.log("Set unposted image urls:", unpostedImagePosts);
+  console.log("Set unposted video urls:", unpostedVideoPosts);
 }
 
-// Downloads an imagePost by the imagePosts url and the file path of the imagePost
-// The file path is added to an imagePost in downloadImagePosts() before invoking
+// Downloads an mediaPost by the mediaPost url and the file path of the mediaPost
+// The file path is added to an mediaPost in downloadPosts() before invoking
 // this method.
-function downloadImagePost(imagePost){
+function downloadImage(imagePost){
   return new Promise((resolve, reject) => {
-    var url = imagePost.url;
-    var filePath = imagePost.filePath;
+    var url = imagePost.imageUrl;
+    var filePath = imagePost.filePath + imagePost.imageExtension;
     console.log("Downloading image by url:", url);
     request.head(url, function(err, res, body){
       request(url).pipe(fs.createWriteStream(filePath)).on('close', () => {
-        console.log("Downloaded image");
+        console.log("Downloaded media");
         resolve();
       });
     });
   });
 }
 
-// For each unpostedImagePost this method sets a download path for the imagePost
-// then downloads the image specified by the imagePost
 function downloadImagePosts(){
-  return new Promise((resolve, reject) => {
-    console.log("Downloading images");
-
-    // Set download paths for each imagePost
-    unpostedImagePosts = unpostedImagePosts.map((imagePost) => {
-      var filePath = 'temp/' + new Date().getTime() + '.jpg';
-      imagePost.filePath = filePath;
-      return imagePost;
-    });
-
+return new Promise((resolve, reject) => {
+    if(unpostedImagePosts.length > 0){
+      console.log("Downloading images");
+    }
     // Download all unpostedImagePosts
     var promiseImages = unpostedImagePosts.map((imagePost) => {
-      console.log("url:", imagePost.url);
-      return downloadImagePost(imagePost);
+      return downloadImage(imagePost);
     });
     Promise.all(promiseImages).then(() => {
       console.log("Downloaded images");
       resolve();
+    });
+  });
+}
+
+function downloadVideo(videoPost){
+  return new Promise((resolve, reject) => {
+    var url = videoPost.videoUrl;
+    var filePath = videoPost.filePath + videoPost.videoExtension;
+    console.log("Downloading video by url:", url);
+    request.head(url, function(err, res, body){
+      request(url).pipe(fs.createWriteStream(filePath)).on('close', () => {
+        console.log("Downloaded media");
+        resolve();
+      });
+    });
+  });
+}
+
+function downloadVideoPosts(){
+  return new Promise((resolve, reject) => {
+    if(unpostedVideoPosts.length > 0){
+      console.log("Downloading videos");
+    }
+    var promiseVideos = unpostedVideoPosts.map((videoPost) => {
+      return downloadVideo(videoPost);
+    });
+    Promise.all(promiseVideos).then(() => {
+      console.log("Downloaded videos");
+      resolve();
+    });
+  });
+}
+
+function downloadVideoImages(){
+  return new Promise((resolve, reject) => {
+    if(unpostedVideoPosts.length > 0){
+      console.log("Downloading video images");
+    }
+    var promiseVideoImages = unpostedVideoPosts.map((videoPost) => {
+      return downloadImage(videoPost);
+    });
+    Promise.all(promiseVideoImages).then(() => {
+      console.log("Downloaded videos");
+      resolve();
+    });
+  });
+}
+
+// For each unpostedImagePost this method sets a download path for the imagePost
+// then downloads the image specified by the imagePost
+function downloadPosts(){
+  return new Promise((resolve, reject) => {
+    downloadImagePosts().then(() =>{
+      downloadVideoPosts().then(() => {
+        downloadVideoImages().then(() => {
+          console.log("Completed all downloads");
+          resolve();
+        });
+      });
     });
   });
 }
@@ -270,7 +367,7 @@ function postImage(imagePost){
     .then((medium) => {
       console.log("Posted image");
       resolve();
-    })
+    });
   });
 }
 
@@ -279,11 +376,46 @@ function postImages(){
   return new Promise((resolve, reject) => {
     // Post the images
     var promiseUploads = unpostedImagePosts.map((imagePost) => {
-        console.log("Path:", imagePost.filePath);
         return postImage(imagePost);
     });
     Promise.all(promiseUploads).then(() => {
-      console.log("Posted images");
+      console.log("Completed posting images");
+      resolve();
+    });
+  });
+}
+
+// Posts the image specifed in the videoPost .The minimum comment is a tag of
+// the original poster.
+function postVideo(videoPost){
+  return new Promise((resolve, reject) => {
+    var videoPath = videoPost.filePath + videoPost.videoExtension;
+    console.log("Posting video:", videoPath);
+    var imagePath = videoPost.filePath + videoPost.imageExtension;
+    var source = 'source: @' + videoPost.sourceName;
+    var comment = videoPost.comment != '' ? videoPost.comment + ' ' + source : source;
+    // Uploads and posts the image to Instagram
+    new Client.Upload.video(session, videoPath, imagePath).then(function(upload) {
+      console.log("upload:", upload);
+    	return new Client.Media.configureVideo(session, upload.uploadId, comment, upload.durationms);
+    })
+    .then(function(medium) {
+      console.log("Posted video");
+      resolve();
+  	});
+  });
+}
+
+// Posts all videos in the unpostedVideoPosts
+function postVideos(){
+  return new Promise((resolve, reject) => {
+    // Post the videos
+    console.log("Posting videos");
+    var promiseUploads = unpostedVideoPosts.map((videoPost) => {
+        return postVideo(videoPost);
+    });
+    Promise.all(promiseUploads).then(() => {
+      console.log("Posted videos");
       resolve();
     });
   });
@@ -314,11 +446,18 @@ function recordPostedUrl(url){
 function recordPostedUrls(){
   return new Promise((resolve, reject) => {
     console.log("Recording posted image urls");
-    var promiseInserts = unpostedImagePosts.map((imagePost) => {
-        return recordPostedUrl(imagePost.url);
+    var promiseInserts;
+
+    var promiseInsertImageUrls = unpostedImagePosts.map((imagePost) => {
+        return recordPostedUrl(imagePost.imageUrl);
     });
+
+    var promiseInsertVideoUrls = unpostedVideoPosts.map((videoPost) => {
+        return recordPostedUrl(videoPost.videoUrl);
+    });
+
     Promise.all(promiseInserts).then(() => {
-      console.log("Recorded posted image urls");
+      console.log("Recorded posted image and video urls");
       resolve();
     });
   });
@@ -331,13 +470,15 @@ function main(){
       setInboxFeed().then(() => {
         setThreadWithName();
         setThreadItemFeed().then(() => {
-          getnewImagePosts();
-          getPostedImageUrls().then(() => {
-            getUnpostedImagePosts();
-            downloadImagePosts().then(() => {
+          getNewPosts();
+          getPostedUrls().then(() => {
+            getUnpostedPosts();
+            downloadPosts().then(() => {
               postImages().then(() => {
-                recordPostedUrls().then(() => {
-                  console.log("Done");
+                postVideos().then(() => {
+                  recordPostedUrls().then(() => {
+                    console.log("Done");
+                  });
                 });
               });
             });
