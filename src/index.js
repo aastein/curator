@@ -445,16 +445,18 @@ function recordPostedUrl(url){
 // be posted again.
 function recordPostedUrls(){
   return new Promise((resolve, reject) => {
-    console.log("Recording posted image urls");
-    var promiseInserts;
+    console.log("Recording posted urls");
+    
+    var promiseInserts = [];
 
     var promiseInsertImageUrls = unpostedImagePosts.map((imagePost) => {
         return recordPostedUrl(imagePost.imageUrl);
     });
-
     var promiseInsertVideoUrls = unpostedVideoPosts.map((videoPost) => {
         return recordPostedUrl(videoPost.videoUrl);
     });
+
+    promiseInserts.push(promiseInsertImageUrls).push(promiseInsertVideoUrls);
 
     Promise.all(promiseInserts).then(() => {
       console.log("Recorded posted image and video urls");
