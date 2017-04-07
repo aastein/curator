@@ -395,7 +395,7 @@ function postVideo(videoPost){
     var source = 'source: @' + videoPost.sourceName;
     var comment = videoPost.comment != '' ? videoPost.comment + ' ' + source : source;
     // Uploads and posts the image to Instagram
-    new Client.Upload.video(session, videoPath, imagePath).then(function(upload) {
+    new Client.Upload.video(session, videoPath, imagePath).then((upload) => {
       console.log("upload:", upload);
     	return new Client.Media.configureVideo(session, upload.uploadId, comment, upload.durationms);
     })
@@ -477,9 +477,9 @@ function main(){
           getPostedUrls().then(() => {
             getUnpostedPosts();
             downloadPosts().then(() => {
-              postImages().then(() => {
+              recordPostedUrls().then(() => {
                 postVideos().then(() => {
-                  recordPostedUrls().then(() => {
+                  postImages().then(() => {
                     console.log("Done");
                   });
                 });
