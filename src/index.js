@@ -381,6 +381,8 @@ function postImages(){
     Promise.all(promiseUploads).then(() => {
       console.log("Completed posting images");
       resolve();
+    }, reason => {
+      console.log(reason)
     });
   });
 }
@@ -417,6 +419,8 @@ function postVideos(){
     Promise.all(promiseUploads).then(() => {
       console.log("Posted videos");
       resolve();
+    }, reason => {
+      console.log(reason)
     });
   });
 }
