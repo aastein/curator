@@ -3,7 +3,6 @@
 require('babelify-es6-polyfill');
 const fs = require('fs');
 const request = require('request');
-const schedule = require('node-schedule');
 const instagram = require('instagram-private-api');
 const MongoClient = require('mongodb').MongoClient
 const assert = require('assert');
